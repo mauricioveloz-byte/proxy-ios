@@ -35,6 +35,10 @@ router.post(
     if (!licenseKey || licenseKey.length > 256) {
       return res.status(400).json({ error: 'A valid License Key is required' });
     }
+    const hwid = typeof req.body.hwid === 'string' ? req.body.hwid.trim() : '';
+    if (!hwid || hwid.length > 128) {
+      return res.status(400).json({ error: 'A valid device identifier is required' });
+    }
 
     const {
       KEYAUTH_NAME: name,
@@ -59,6 +63,7 @@ router.post(
         ownerid,
         sessionid: initialization.sessionid,
         key: licenseKey,
+        hwid,
       });
     } catch (error) {
       console.error('KeyAuth request failed:', error.message);
@@ -66,7 +71,10 @@ router.post(
     }
 
     if (authentication.success !== true) {
-      return res.status(401).json({ error: 'License Key is invalid or inactive' });
+      const reason = typeof authentication.message === 'string' && authentication.message.trim();
+      return res.status(401).json({
+        error: reason ? `KeyAuth: ${reason}` : 'KeyAuth rechazó la licencia; revisa que esté activa y pertenezca a esta aplicación.',
+      });
     }
 
     const username = authentication.info?.username;
