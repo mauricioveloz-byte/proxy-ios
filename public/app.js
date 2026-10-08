@@ -13,6 +13,16 @@ const activateSelectedButton = document.querySelector('#activate-selected');
 let activeResourceId = null;
 
 const tokenStorageKey = 'customizationHubToken';
+const deviceIdStorageKey = 'customizationHubDeviceId';
+
+function getDeviceId() {
+  let deviceId = localStorage.getItem(deviceIdStorageKey);
+  if (!deviceId) {
+    deviceId = crypto.randomUUID();
+    localStorage.setItem(deviceIdStorageKey, deviceId);
+  }
+  return deviceId;
+}
 
 function setNotice(message, isError = false) {
   notice.textContent = message;
@@ -159,7 +169,7 @@ loginForm.addEventListener('submit', async (event) => {
     const response = await fetch('/api/v1/login-keyauth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ licenseKey: formData.get('licenseKey') }),
+      body: JSON.stringify({ licenseKey: formData.get('licenseKey'), hwid: getDeviceId() }),
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || 'No se pudo validar la licencia');
