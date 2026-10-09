@@ -6,6 +6,31 @@ const asyncHandler = require('../middleware/async-handler');
 
 const router = express.Router();
 
+function resolveKeyAuthRole(info, environment = process.env) {
+  const adminUsernames = new Set(
+    (environment.KEYAUTH_ADMIN_USERNAMES || '')
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const adminSubscriptions = new Set(
+    (environment.KEYAUTH_ADMIN_SUBSCRIPTIONS || '')
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean)
+  );
+  const keyAuthUsername = typeof info?.username === 'string' ? info.username.trim().toLowerCase() : '';
+  const subscriptionNames = Array.isArray(info?.subscriptions)
+    ? info.subscriptions
+      .map(({ subscription }) => typeof subscription === 'string' ? subscription.trim().toLowerCase() : '')
+    : [];
+
+  return adminUsernames.has(keyAuthUsername) ||
+    subscriptionNames.some((subscription) => adminSubscriptions.has(subscription))
+    ? 'admin'
+    : 'user';
+}
+
 async function keyAuthRequest(fields) {
   const apiURL = process.env.KEYAUTH_API_URL || 'https://keyauth.win/api/1.2/';
   if (new URL(apiURL).protocol !== 'https:') {
@@ -82,13 +107,7 @@ router.post(
       return res.status(502).json({ error: 'KeyAuth response did not include a user identity' });
     }
     const keyAuthUsername = username.trim().toLowerCase();
-    const adminUsernames = new Set(
-      (process.env.KEYAUTH_ADMIN_USERNAMES || '')
-        .split(',')
-        .map((value) => value.trim().toLowerCase())
-        .filter(Boolean)
-    );
-    const role = adminUsernames.has(keyAuthUsername) ? 'admin' : 'user';
+    const role = resolveKeyAuthRole(authentication.info);
     const emailHash = crypto.createHash('sha256').update(keyAuthUsername).digest('hex');
     const user = await User.findOneAndUpdate(
       { keyAuthUsername },
@@ -115,3 +134,4 @@ router.post(
 );
 
 module.exports = router;
+module.exports.resolveKeyAuthRole = resolveKeyAuthRole;
